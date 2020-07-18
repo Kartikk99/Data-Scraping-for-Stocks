@@ -1,0 +1,201 @@
+import numpy as np
+
+import requests
+from bs4 import BeautifulSoup
+
+import xlwt 
+from xlwt import Workbook
+
+style1 = xlwt.easyxf('pattern : pattern solid, fore_colour red;')
+style2 = xlwt.easyxf('pattern : pattern solid, fore_colour green;')
+style3 = xlwt.easyxf('pattern : pattern solid, fore_colour yellow;')
+
+import xlrd
+
+wb = Workbook()
+
+horizontal = 0
+column = 0
+
+url = input("Enter Website :")
+
+response = requests.get(url)
+
+if response.status_code == 200:
+
+	soup = BeautifulSoup(response.content, 'html.parser')
+	Data = soup.find('section',id='cash-flow')
+	Data1 = Data.find(class_='responsive-holder')
+
+	sheet1 = wb.add_sheet('Sheet 1')
+
+	sheet1.write(0,0,'Cash-Flow Statement')
+	
+	for row in Data1.find_all('tr'):
+		for cell in row.find_all('td'):
+			if cell.text == "":
+				sheet1.write(horizontal, column, 0)
+			else:
+				sheet1.write(horizontal, column, cell.text)
+			column = column + 1
+		column = 0
+		horizontal = horizontal + 1
+	column = 0
+	horizontal = horizontal + 1
+	sheet1.write(horizontal,column,'Profit-Loss Statement')
+	
+	PL_Data = soup.find('section' , id = 'profit-loss')
+	
+	for row in PL_Data.find_all('tr'):
+		for cell in row.find_all('td'):
+			if cell.text == "":
+				sheet1.write(horizontal, column, 0)
+			else:
+				sheet1.write(horizontal, column,cell.text)
+			column = column + 1
+		column = 0
+		horizontal = horizontal + 1
+	
+	column = 0
+	horizontal = horizontal + 1
+	sheet1.write(horizontal,column,'Balance-Sheet Statement')
+	
+	BL_Data = soup.find('section' , id = 'balance-sheet')
+	
+	for row in BL_Data.find_all('tr'):
+		for cell in row.find_all('td'):
+			if cell.text == "":
+				sheet1.write(horizontal, column, 0)
+			else:
+				sheet1.write(horizontal, column,cell.text)
+			column = column + 1
+		column = 0
+		horizontal = horizontal + 1
+
+	Gen_Data = soup.find_all(class_='four columns')
+	
+	column = 0
+	horizontal = horizontal + 1
+	
+	sheet1.write(horizontal,column,'General Data')
+	horizontal = horizontal + 1
+	list_A = [0,1,3,4,5,6,7,8,11]
+	list_B = [2,9,10]
+	for i in list_A:
+		Gen_Data1 = Gen_Data[i].text
+		data = Gen_Data1.split(":")
+		sheet1.write(horizontal, column, data[0])
+		column = column+1
+		sheet1.write(horizontal, column, data[1])
+		horizontal = horizontal + 1
+		column = 0
+
+	wb.save('xlwt file_name.xls')
+	
+else :
+	print("Error page could not be parsed", '\n')
+	
+horizontal+=1
+sheet1.write(horizontal,column, 'Decision Data', style1)
+horizontal+=1
+
+path = "C:\\Users\\SAGAR G KULKARNI\\Desktop\\Kartik Programming\\Python\\xlwt file_name.xls"
+
+wb_obj = xlrd.open_workbook(path)
+
+sheet_obj = wb_obj.sheet_by_name('Sheet 1')
+	
+current_price = sheet_obj.cell(54,1).value.replace('\n', '')
+current_price = current_price.replace('\t','')
+book_value = sheet_obj.cell(55,1).value
+
+pbv = float(current_price)/float(book_value)
+sheet1.write(horizontal,column, 'P/Bv should be less than 1(depending upon the industry)')
+column+=1
+if pbv <1.0:
+	sheet1.write(horizontal, column,pbv, style2)
+elif pbv>1 and pbv <2.0:
+	sheet1.write(horizontal, column,pbv, style3)
+else:
+	sheet1.write(horizontal, column,pbv, style1)
+
+horizontal+=1
+column = 0
+
+eps = sheet_obj.cell(17, 12).value
+if float(eps) != 0:
+	pe = float(current_price)/float(eps)
+else:
+	pe = 0
+sheet1.write(horizontal, column, 'P/Eps lower the better')
+column+=1
+sheet1.write(horizontal,column,pe, style3)
+
+horizontal+=1
+column = 0
+eps_sum = 0
+for i in range(1,13):
+	eps_sum+=float(sheet_obj.cell(17,i).value)
+eps_avg = eps_sum/12
+if float(eps_avg) != 0:
+	cpavg = float(current_price)/float(eps_avg)
+else :
+	cpavg = 0
+sheet1.write(horizontal,column, 'P/avgEps')
+column+=1
+sheet1.write(horizontal,column,cpavg)
+
+
+horizontal+=1
+column = 0
+int_coverage = 0
+
+sheet1.write(horizontal, column, 'Interest Coverage')
+column+=1
+
+for i in range(1,13):
+	op_profit = float(sheet_obj.cell(9,i).value.replace(',', ''))
+	interest = float(sheet_obj.cell(12,i).value.replace(',', ''))
+	if(interest != 0):
+		int_coverage = op_profit/interest
+	else:
+		int_coverage = 0
+	sheet1.write(horizontal,column, int_coverage)
+	column+=1
+horizontal+=1
+column=0
+
+pv_sales = float(sheet_obj.cell(7,6).value.replace(',', ''))
+fv_sales = float(sheet_obj.cell(7,13).value.replace(',', ''))
+sales_rate = (np.rate(7, 0, -pv_sales, fv_sales ))*100
+sheet1.write(horizontal, column, 'Sales Rate')
+column+=1
+sheet1.write(horizontal,column,sales_rate)
+horizontal+=1
+column=0
+
+pv_expense = float(sheet_obj.cell(8,6).value.replace(',', ''))
+fv_expense = float(sheet_obj.cell(8,13).value.replace(',', ''))
+expense_rate = (np.rate(7, 0, -pv_expense, fv_expense ))*100
+sheet1.write(horizontal, column, 'Expense Rate')
+column+=1
+sheet1.write(horizontal,column,expense_rate)
+horizontal+=1
+column=0
+
+pv_eps = float(sheet_obj.cell(17,6).value.replace(',', ''))
+fv_eps = float(sheet_obj.cell(17,12).value.replace(',', ''))
+eps_rate = (np.rate(7, 0, -pv_eps, fv_eps ))*100
+sheet1.write(horizontal, column, 'Eps Rate average should be around 7-10%')
+column+=1
+sheet1.write(horizontal,column,eps_rate)
+horizontal+=1
+column=0
+
+
+wb.save('xlwt file_name.xls')
+
+
+
+
+
